@@ -3,80 +3,67 @@ import pandas as pd
 import plotly.express as px
 
 # Configuración de página
-st.set_page_config(page_title="EDA Generación - Muestra 10%", layout="wide")
+st.set_page_config(page_title="Análisis Generación - GitHub Data", layout="wide")
 
 @st.cache_data
-def load_data_sample():
-    # URL de S3 (ajusta según tu bucket y archivo final)
-    path = "s3://eafit-proyecto-integrador-simem/gold/Generacion"
+def load_data_from_github():
+    # REEMPLAZA ESTA URL con la que copiaste en el paso 1 (el botón 'Raw' de GitHub)
+    url = "https://raw.githubusercontent.com/tu-usuario/tu-repo/main/Generacion.csv"
     
     try:
-        # Cargamos el 10% aleatorio usando el motor pyarrow
-        # Nota: read_parquet no tiene 'sample' nativo, cargamos columnas clave y luego muestreamos
-        # para ser ultra eficientes con la memoria de Streamlit
-        df = pd.read_parquet(
-            path,
-            columns=["fechahora", "tipogeneracion", "valor", "nombreunidad", "codigoplanta"],
-            storage_options={
-                "key": st.secrets["aws"]["access_key"],
-                "secret": st.secrets["aws"]["secret_key"],
-                "client_kwargs": {"region_name": st.secrets["aws"]["region"]}
-            }
-        )
+        # Cargamos el CSV completo
+        df = pd.read_csv(url)
         
-        # Selección aleatoria del 10%
+        # Selección aleatoria del 10% para optimizar rendimiento
         df_sample = df.sample(frac=0.10, random_state=42)
         
-        # Formateo de tipos
-        df_sample["fechahora"] = pd.to_datetime(df_sample["fechahora"])
-        df_sample["valor"] = pd.to_numeric(df_sample["valor"], downcast="float")
+        # Limpieza y conversión de tipos basada en tu archivo
+        if 'fechahora' in df_sample.columns:
+            df_sample["fechahora"] = pd.to_datetime(df_sample["fechahora"])
         
+        if 'valor' in df_sample.columns:
+            df_sample["valor"] = pd.to_numeric(df_sample["valor"], errors='coerce').fillna(0)
+            
         return df_sample
     except Exception as e:
-        st.error(f"Error de conexión: {e}")
+        st.error(f"Error al cargar el CSV desde GitHub: {e}")
         return None
 
-# Carga de la muestra
-df = load_data_sample()
+# Ejecución
+st.title("⚡ Dashboard de Generación (Fuente: GitHub CSV)")
+df = load_data_from_github()
 
 if df is not None:
-    st.title("📊 Análisis Exploratorio (Muestra Aleatoria 10%)")
-    st.markdown(f"Trabajando con una muestra representativa de **{len(df):,}** registros.")
+    st.info(f"Visualizando una muestra aleatoria del 10% ({len(df):,} registros) para optimizar el rendimiento.")
 
-    # --- MÉTRICAS RÁPIDAS ---
+    # --- MÉTRICAS ---
     m1, m2, m3 = st.columns(3)
-    m1.metric("Generación Total (Muestra)", f"{df['valor'].sum():,.2f} kWh")
-    m2.metric("Plantas Únicas", df["codigoplanta"].nunique())
-    m3.metric("Tipos de Tecnología", df["tipogeneracion"].nunique())
+    with m1:
+        total_gen = df['valor'].sum()
+        st.metric("Generación Total (Muestra)", f"{total_gen:,.2f} kWh")
+    with m2:
+        plantas = df['codigoplanta'].nunique() if 'codigoplanta' in df.columns else "N/A"
+        st.metric("Plantas en Muestra", plantas)
+    with m3:
+        tipos = df['tipogeneracion'].nunique() if 'tipogeneracion' in df.columns else "N/A"
+        st.metric("Tipos de Energía", tipos)
 
-    # --- VISUALIZACIÓN EXPLORATORIA ---
-    col1, col2 = st.columns(2)
+    # --- GRÁFICA DE SERIE TEMPORAL ---
+    st.subheader("Evolución Temporal de la Generación")
+    if 'fechahora' in df.columns and 'valor' in df.columns:
+        # Agrupamos por día para que la gráfica no sea pesada
+        df_diario = df.groupby([pd.Grouper(key="fechahora", freq="D"), "tipogeneracion"])["valor"].sum().reset_index()
+        
+        fig = px.line(df_diario, x="fechahora", y="valor", color="tipogeneracion",
+                      title="Generación Diaria por Tecnología",
+                      labels={"valor": "Generación (kWh)", "fechahora": "Fecha"})
+        st.plotly_chart(fig, use_container_width=True)
 
-    with col1:
-        st.subheader("Distribución por Tecnología")
-        fig_pie = px.pie(df, names='tipogeneracion', values='valor', 
-                         hole=0.4, title="Participación en la Generación")
-        st.plotly_chart(fig_pie, use_container_width=True)
-
-    with col2:
-        st.subheader("Top 10 Unidades Generadoras")
-        top_unidades = df.groupby("nombreunidad")["valor"].sum().nlargest(10).reset_index()
-        fig_bar = px.bar(top_unidades, x="valor", y="nombreunidad", orientation='h',
-                         color="valor", color_continuous_scale="Viridis")
-        st.plotly_chart(fig_bar, use_container_width=True)
-
-    # --- ANÁLISIS TEMPORAL ---
-    st.subheader("Evolución de la Generación en el Tiempo")
-    # Agrupamos por día para suavizar la gráfica y mejorar el rendimiento del navegador
-    df_ts = df.groupby([pd.Grouper(key="fechahora", freq="D"), "tipogeneracion"])["valor"].sum().reset_index()
-    
-    fig_ts = px.line(df_ts, x="fechahora", y="valor", color="tipogeneracion",
-                     title="Tendencia Diaria por Fuente de Energía")
-    st.plotly_chart(fig_ts, use_container_width=True)
-
-    # --- TABLA DE DATOS CRUDA (MUESTRA) ---
-    with st.expander("Ver datos de la muestra"):
-        st.dataframe(df.head(100))
+    # --- DISTRIBUCIÓN ---
+    st.subheader("Distribución por Fuente")
+    fig_pie = px.sunburst(df, path=['tipogeneracion', 'nombreunidad'], values='valor',
+                          title="Jerarquía de Generación (Muestra)")
+    st.plotly_chart(fig_pie, use_container_width=True)
 
 else:
-    st.warning("No se pudieron cargar los datos. Verifica tus credenciales en Secrets y la ruta de S3.")
+    st.warning("No se pudo cargar la base de datos. Verifica la URL de GitHub Raw.")
