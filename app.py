@@ -2,21 +2,19 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# Configuración de página
-st.set_page_config(page_title="EDA Generación - Muestra 10%", layout="wide")
+# Configuración de la página
+st.set_page_config(page_title="EDA Generación - S3", layout="wide")
 
 @st.cache_data
-def load_data_sample():
-    # URL de S3 (ajusta según tu bucket y archivo final)
-    path = "s3://eafit-proyecto-integrador-simem/gold/Generacion"
+def load_data_from_s3():
+    # Ruta oficial en S3
+    path = "s3://eafit-proyecto-integrador-simem/gold/Generacion.parquet"
     
     try:
-        # Cargamos el 10% aleatorio usando el motor pyarrow
-        # Nota: read_parquet no tiene 'sample' nativo, cargamos columnas clave y luego muestreamos
-        # para ser ultra eficientes con la memoria de Streamlit
+        # Cargamos columnas clave para no saturar la RAM
         df = pd.read_parquet(
             path,
-            columns=["fechahora", "tipogeneracion", "valor", "nombreunidad", "codigoplanta"],
+            columns=["fechahora", "tipogeneracion", "valor", "nombreunidad"],
             storage_options={
                 "key": st.secrets["aws"]["access_key"],
                 "secret": st.secrets["aws"]["secret_key"],
@@ -24,7 +22,7 @@ def load_data_sample():
             }
         )
         
-        # Selección aleatoria del 10%
+        # Muestreo aleatorio del 10%
         df_sample = df.sample(frac=0.10, random_state=42)
         
         # Formateo de tipos
@@ -32,55 +30,46 @@ def load_data_sample():
         df_sample["valor"] = pd.to_numeric(df_sample["valor"], downcast="float")
         
         return df_sample
+    
     except Exception as e:
-        st.error(f"Error de conexión: {e}")
+        st.error(f"Error de conexión a S3: {e}")
         return None
 
-# Carga de la muestra
-df = load_data_sample()
+# --- LÓGICA PRINCIPAL ---
+st.title("🚀 Análisis de Generación (AWS S3)")
+df = load_data_from_s3()
 
 if df is not None:
-    st.title("📊 Análisis Exploratorio (Muestra Aleatoria 10%)")
-    st.markdown(f"Trabajando con una muestra representativa de **{len(df):,}** registros.")
-
-    # --- MÉTRICAS RÁPIDAS ---
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Generación Total (Muestra)", f"{df['valor'].sum():,.2f} kWh")
-    m2.metric("Plantas Únicas", df["codigoplanta"].nunique())
-    m3.metric("Tipos de Tecnología", df["tipogeneracion"].nunique())
-
-    # --- VISUALIZACIÓN EXPLORATORIA ---
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("Distribución por Tecnología")
-        fig_pie = px.pie(df, names='tipogeneracion', values='valor', 
-                         hole=0.4, title="Participación en la Generación")
-        st.plotly_chart(fig_pie, use_container_width=True)
-
-    with col2:
-        st.subheader("Top 10 Unidades Generadoras")
-        top_unidades = df.groupby("nombreunidad")["valor"].sum().nlargest(10).reset_index()
-        fig_bar = px.bar(top_unidades, x="valor", y="nombreunidad", orientation='h',
-                         color="valor", color_continuous_scale="Viridis")
-        st.plotly_chart(fig_bar, use_container_width=True)
-
-    # --- ANÁLISIS TEMPORAL ---
-    st.subheader("Evolución de la Generación en el Tiempo")
-    # Agrupamos por día para suavizar la gráfica y mejorar el rendimiento del navegador
-    df_ts = df.groupby([pd.Grouper(key="fechahora", freq="D"), "tipogeneracion"])["valor"].sum().reset_index()
+    st.success("Conexión exitosa con Amazon S3")
     
-    fig_ts = px.line(df_ts, x="fechahora", y="valor", color="tipogeneracion",
-                     title="Tendencia Diaria por Fuente de Energía")
-    st.plotly_chart(fig_ts, use_container_width=True)
+    # 1. Filtros
+    tecnologias = st.sidebar.multiselect(
+        "Seleccionar Tecnologías", 
+        options=df["tipogeneracion"].unique(),
+        default=df["tipogeneracion"].unique()
+    )
+    df_filtered = df[df["tipogeneracion"].isin(tecnologias)]
 
-    # --- TABLA DE DATOS CRUDA (MUESTRA) ---
-    with st.expander("Ver datos de la muestra"):
-        st.dataframe(df.head(100))
+    # 2. Análisis Evolución Temporal (Área Apilada)
+    st.subheader("Evolución de la Matriz Energética")
+    df_daily = df_filtered.groupby([pd.Grouper(key="fechahora", freq="D"), "tipogeneracion"])["valor"].sum().reset_index()
+    
+    fig_area = px.area(
+        df_daily, x="fechahora", y="valor", color="tipogeneracion",
+        title="Generación Diaria por Tecnología (Muestra 10%)",
+        color_discrete_sequence=px.colors.qualitative.Dark24
+    )
+    st.plotly_chart(fig_area, use_container_width=True)
+
+    # 3. Comparativa Individual (Facetas)
+    st.subheader("Tendencias Individuales")
+    fig_sep = px.line(
+        df_daily, x="fechahora", y="valor", color="tipogeneracion",
+        facet_col="tipogeneracion", facet_col_wrap=2
+    )
+    fig_sep.update_yaxes(matches=None)
+    st.plotly_chart(fig_sep, use_container_width=True)
 
 else:
-    st.warning("No se pudieron cargar los datos. Verifica tus credenciales en Secrets y la ruta de S3.")
-
-
-else:
-    st.warning("No se pudo cargar la información desde GitHub. Verifica la URL.")
+    # Este es el 'else' que te daba error, ahora está correctamente alineado con el 'if df is not None'
+    st.info("A la espera de datos... Revisa que los Secrets en Streamlit Cloud tengan las nuevas Access Keys.")
