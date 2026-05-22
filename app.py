@@ -17,8 +17,6 @@ def load_data() -> Optional[pd.DataFrame]:
     """
     Carga el parquet desde S3, convierte tipos y retorna
     una muestra aleatoria del 10% (reproducible con random_state=42).
-    La conversión de tipos ocurre dentro del caché para que no se
-    repita en cada interacción del usuario.
     """
     path = "s3://eafit-proyecto-integrador-simem/gold/Generacion.parquet"
     try:
@@ -60,7 +58,6 @@ if data is None:
 with st.sidebar:
     st.header("🔧 Filtros")
 
-    # Filtro de tecnología
     all_tecs = sorted(data["tipogeneracion"].dropna().unique())
     tecs = st.multiselect(
         "Tecnologías",
@@ -68,7 +65,6 @@ with st.sidebar:
         default=all_tecs,
     )
 
-    # Filtro de rango de fechas
     fecha_min = data["fechahora"].min().date()
     fecha_max = data["fechahora"].max().date()
     fecha_rango = st.date_input(
@@ -99,17 +95,15 @@ col4.metric("Promedio por registro (MWh)", f"{df_f['valor'].mean():,.1f}")
 
 st.divider()
 
-# ── Agrupación diaria — API pandas 3.x compatible ────────────────────────────
-# Se usa resample con on= en lugar de pd.Grouper para máxima compatibilidad
+# ── Agrupación diaria — compatible pandas 2.2 ─────────────────────────────────
+# Se usa resample con on= para evitar pd.Grouper que fue modificado en pandas 3
 df_daily = (
     df_f
-    .groupby("tipogeneracion", observed=True)
-    .apply(
-        lambda g: g.resample("D", on="fechahora")["valor"].sum(),
-        include_groups=False,
-    )
+    .set_index("fechahora")
+    .groupby("tipogeneracion", observed=True)["valor"]
+    .resample("D")
+    .sum()
     .reset_index()
-    .rename(columns={"fechahora": "fechahora"})
 )
 
 # ── 1. Evolución temporal — Área apilada ──────────────────────────────────────
