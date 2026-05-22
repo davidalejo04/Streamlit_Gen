@@ -3,3 +3,4 @@ pandas
 plotly
 pyarrow
 s3fs
+fsspec
