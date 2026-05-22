@@ -74,7 +74,7 @@ df_daily = df_f.set_index("fechahora").groupby("tipogeneracion")["valor"].resamp
 
 fig1 = px.area(df_daily, x="fechahora", y="valor", color="tipogeneracion", template="plotly_dark")
 fig1.update_layout(hovermode="x unified")
-               labels={"fechahora": "Mes-Año", 
+labels={"fechahora": "Mes-Año", 
                          "valor": "Generación [MW/H]", 
                          "tipogeneracion": "Tipo de generación"})
 st.plotly_chart(fig1, use_container_width=True)
