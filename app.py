@@ -1,4 +1,4 @@
-import traceback
+mport traceback
 from typing import Optional
 
 import pandas as pd
@@ -32,7 +32,8 @@ def load_data() -> Optional[pd.DataFrame]:
 
         # Conversión de tipos dentro del caché (se ejecuta solo una vez)
         df["fechahora"] = pd.to_datetime(df["fechahora"], errors="coerce")
-        df["valor"] = pd.to_numeric(df["valor"], errors="coerce").astype("float32")
+        # valor viene como kWh — convertir a MWh
+        df["valor"] = pd.to_numeric(df["valor"], errors="coerce") / 1000.0
         df = df.dropna(subset=["fechahora", "valor"])
 
         # Muestra aleatoria del 10% — reproducible
@@ -47,7 +48,7 @@ def load_data() -> Optional[pd.DataFrame]:
 
 # ── Título ────────────────────────────────────────────────────────────────────
 st.title("📊 Análisis de Generación Eléctrica")
-st.caption("Muestra aleatoria del 10% del dataset · Fuente: SIMEM")
+st.caption("Muestra aleatoria del 10% del dataset · Fuente: SIMEM · Unidad: MWh")
 
 data = load_data()
 
@@ -95,8 +96,8 @@ col4.metric("Promedio por registro (MWh)", f"{df_f['valor'].mean():,.1f}")
 
 st.divider()
 
-# ── Agrupación diaria — compatible pandas 2.2 ─────────────────────────────────
-# Se usa resample con on= para evitar pd.Grouper que fue modificado en pandas 3
+# ── Agrupación diaria ─────────────────────────────────────────────────────────
+# Usamos resample sobre el índice datetime — compatible con pandas 2.2 y 3.x
 df_daily = (
     df_f
     .set_index("fechahora")
@@ -148,8 +149,10 @@ st.plotly_chart(fig2, use_container_width=True)
 
 # ── 3. Distribución — Boxplot ─────────────────────────────────────────────────
 st.subheader("📦 Distribución de Valores por Tecnología")
+# Excluimos ceros para que el boxplot sea más informativo
+df_nonzero = df_f[df_f["valor"] > 0]
 fig3 = px.box(
-    df_f,
+    df_nonzero,
     x="tipogeneracion",
     y="valor",
     color="tipogeneracion",
@@ -158,3 +161,29 @@ fig3 = px.box(
 )
 fig3.update_layout(showlegend=False, margin=dict(t=30, b=30))
 st.plotly_chart(fig3, use_container_width=True)
+
+# ── 4. Top unidades generadoras ───────────────────────────────────────────────
+st.subheader("🏆 Top 10 Unidades Generadoras")
+top_unidades = (
+    df_f.groupby("nombreunidad", observed=True)["valor"]
+    .sum()
+    .sort_values(ascending=False)
+    .head(10)
+    .reset_index()
+)
+fig4 = px.bar(
+    top_unidades,
+    x="valor",
+    y="nombreunidad",
+    orientation="h",
+    labels={"valor": "Generación total (MWh)", "nombreunidad": "Unidad"},
+    template="plotly_dark",
+    color="valor",
+    color_continuous_scale="Blues",
+)
+fig4.update_layout(
+    yaxis=dict(categoryorder="total ascending"),
+    coloraxis_showscale=False,
+    margin=dict(t=30, b=30),
+)
+st.plotly_chart(fig4, use_container_width=True)
