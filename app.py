@@ -13,7 +13,7 @@ st.set_page_config(
 
 @st.cache_data(show_spinner="Cargando datos desde S3...")
 def load_data() -> Optional[pd.DataFrame]:
-    path = "s3://eafit-proyecto-integrador-simem/gold/Generacion.parquet"
+    path = "s3://eafit-proyecto-integrador-simem/gold/Generacion_10.parquet"
     try:
         df = pd.read_parquet(
             path,
