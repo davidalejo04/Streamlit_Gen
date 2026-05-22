@@ -8,7 +8,7 @@ st.set_page_config(page_title="Análisis Generación - GitHub Data", layout="wid
 @st.cache_data
 def load_data_from_github():
     # REEMPLAZA ESTA URL con la que copiaste en el paso 1 (el botón 'Raw' de GitHub)
-    url = "https://raw.githubusercontent.com/tu-usuario/tu-repo/main/Generacion.csv"
+    url = "https://raw.githubusercontent.com/davidalejo04/Streamlit_Gen/refs/heads/main/untitled%20(2).csv"
     
     try:
         # Cargamos el CSV completo
