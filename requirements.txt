@@ -1,6 +1,5 @@
 streamlit
 pandas
+plotly
 pyarrow
 s3fs
-plotly
-boto3
