@@ -17,8 +17,8 @@ def load_data():
     df = pd.read_parquet(
         s3_uri,
         storage_options={
-            "key": aws_creds["AKIA4Y73QRYHHL5OAFGD"],
-            "secret": aws_creds["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"],
+            "key": aws_creds["access_key"],
+            "secret": aws_creds["secret_key"],
             "client_kwargs": {"region_name": aws_creds["us-east-1"]}
         }
     )
