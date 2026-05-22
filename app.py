@@ -72,14 +72,13 @@ if df_f.empty:
 st.subheader("📈 Evolución Temporal por Tecnología")
 df_daily = df_f.set_index("fechahora").groupby("tipogeneracion")["valor"].resample("D").sum().reset_index()
 
-fig1 = px.area(df_daily, x="fechahora", y="valor", color="tipogeneracion", template="plotly_dark")
+fig1 = px.area(df_daily, x="fechahora", y="valor", color="tipogeneracion", template="plotly_dark",labels={"fechahora": "Mes-Año", "valor": "Generación [MW/H]", "tipogeneracion": "Tipo de generación"})
 fig1.update_layout(hovermode="x unified")
-labels={"fechahora": "Mes-Año", "valor": "Generación [MW/H]", "tipogeneracion": "Tipo de generación"})
 st.plotly_chart(fig1, use_container_width=True)
 
 st.subheader("🔍 Detalle por Tecnología")
 fig2 = px.line(df_daily, x="fechahora", y="valor", color="tipogeneracion", 
-               facet_col="tipogeneracion", facet_col_wrap=2, template="plotly_dark")
+               facet_col="tipogeneracion", facet_col_wrap=2, template="plotly_dark",
                labels={"fechahora": "Mes-Año", "valor": "Generación [MW/H]", "tipogeneracion": "Tipo de generación"})
 fig2.update_yaxes(matches=None)
 fig2.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
