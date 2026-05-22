@@ -12,7 +12,7 @@ def load_data():
     
     # Ruta del archivo Parquet en S3
     # Si Spark generó varios archivos, apunta a la carpeta o al archivo .parquet específico
-    s3_uri = "eafit-proyecto-integrador-simem.s3.us-east-1.amazonaws.com/gold/Generacion.parquet"
+    s3_uri = "s3://eafit-proyecto-integrador-simem.s3.us-east-1.amazonaws.com/gold/Generacion.parquet"
     
     df = pd.read_parquet(
         s3_uri,
