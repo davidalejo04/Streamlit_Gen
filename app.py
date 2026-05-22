@@ -8,7 +8,7 @@ st.set_page_config(page_title="EDA Generación - Muestra 10%", layout="wide")
 @st.cache_data
 def load_data_sample():
     # URL de S3 (ajusta según tu bucket y archivo final)
-    path = "s3://eafit-proyecto-integrador-simem/gold/Generacion.parquet"
+    path = "eafit-proyecto-integrador-simem/gold/Generacion.parquet"
     
     try:
         # Cargamos el 10% aleatorio usando el motor pyarrow
