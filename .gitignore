@@ -1,0 +1,9 @@
+# Ignorar configuración local de Streamlit
+.streamlit/config.toml
+.streamlit/secrets.toml
+
+# Ignorar archivos de Python y entornos virtuales
+__pycache__/
+*.pyc
+venv/
+.env
