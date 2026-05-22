@@ -19,7 +19,7 @@ def load_data():
         storage_options={
             "key": aws_creds["access_key"],
             "secret": aws_creds["secret_key"],
-            "client_kwargs": {"region_name": aws_creds["us-east-1"]}
+            "client_kwargs": {"region_name": aws_creds["region"]}
         }
     )
     return df
